@@ -7,22 +7,33 @@ on:
 jobs:
   build-and-deploy:
     runs-on: self-hosted
+
     steps:
     - name: Checkout code manually
+      shell: powershell
       run: |
-        git clone --depth=1 https://github.com/${{ github.repository }}.git .
-        git checkout ${{ github.sha }}
+        if (Test-Path "_repo") {
+          Remove-Item "_repo" -Recurse -Force
+        }
+
+        git clone https://github.com/${{ github.repository }}.git _repo
+        cd _repo
+        git checkout $env:GITHUB_SHA
 
     - name: Verify Java
+      working-directory: _repo
       run: java -version
 
     - name: Build with Maven
+      working-directory: _repo
       run: mvn clean package -DskipTests
 
     - name: Build Docker image locally
+      working-directory: _repo
       run: docker build -t microservice-project:latest .
 
     - name: Deploy to Kubernetes
+      working-directory: _repo
       run: |
         kubectl apply -f k8s-deployment.yaml
         kubectl rollout status deployment/my-app
