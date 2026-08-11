@@ -11,6 +11,11 @@ jobs:
     permissions:
       contents: read
 
+    #  تنظیم متغیرهای محیطی برای کل Job (مهم!)
+    env:
+      DOCKER_CONTEXT: desktop-linux
+      DOCKER_HOST: npipe:////./pipe/dockerDesktopLinuxEngine
+
     defaults:
       run:
         shell: powershell
@@ -29,17 +34,58 @@ jobs:
           $cloneUrl = "https://x-access-token:${env:GH_TOKEN}@github.com/${env:GITHUB_REPOSITORY}.git"
           git clone --depth 1 --branch "${env:GITHUB_REF_NAME}" $cloneUrl source
 
+      # 🔥 STEP جدید: تنظیم Docker Context قبل از هر چیزی
+      - name: Fix Docker Context
+        run: |
+          Write-Host "========================================" -ForegroundColor Cyan
+          Write-Host "Fixing Docker Context..." -ForegroundColor Yellow
+          Write-Host "========================================" -ForegroundColor Cyan
+          
+          # تنظیم کانتکست
+          docker context use desktop-linux
+          
+          # نمایش کانتکست‌ها برای تأیید
+          docker context ls
+          
+          # تست connection
+          docker version
+          
+          Write-Host "========================================" -ForegroundColor Green
+          Write-Host "Docker Context Fixed Successfully!" -ForegroundColor Green
+          Write-Host "========================================" -ForegroundColor Green
+        env:
+          DOCKER_CONTEXT: desktop-linux
+          DOCKER_HOST: npipe:////./pipe/dockerDesktopLinuxEngine
+
       - name: Check tools
         run: |
           Set-Location ".\source"
+          
+          Write-Host "========================================" -ForegroundColor Cyan
+          Write-Host "Checking Tools..." -ForegroundColor Yellow
+          Write-Host "========================================" -ForegroundColor Cyan
+          
           java -version
+          
+          Write-Host "`nDocker Version:" -ForegroundColor Green
           docker version
+          
+          Write-Host "`nKubectl Version:" -ForegroundColor Green
           kubectl version --client
+          
+          Write-Host "`nKubectl Current Context:" -ForegroundColor Green
           kubectl config current-context
+        env:
+          DOCKER_CONTEXT: desktop-linux
+          DOCKER_HOST: npipe:////./pipe/dockerDesktopLinuxEngine
 
       - name: Build with Maven
         run: |
           Set-Location ".\source"
+
+          Write-Host "========================================" -ForegroundColor Cyan
+          Write-Host "Building with Maven..." -ForegroundColor Yellow
+          Write-Host "========================================" -ForegroundColor Cyan
 
           if (Test-Path ".\mvnw.cmd") {
             .\mvnw.cmd clean package -DskipTests
@@ -50,16 +96,37 @@ jobs:
       - name: Build Docker Image
         run: |
           Set-Location ".\source"
+          
+          Write-Host "========================================" -ForegroundColor Cyan
+          Write-Host "Building Docker Image..." -ForegroundColor Yellow
+          Write-Host "========================================" -ForegroundColor Cyan
+          
           docker build -t product-service:latest .
+          
+          Write-Host "`nDocker Images:" -ForegroundColor Green
+          docker images | Select-String "product-service"
+        env:
+          DOCKER_CONTEXT: desktop-linux
+          DOCKER_HOST: npipe:////./pipe/dockerDesktopLinuxEngine
 
       - name: Apply Kubernetes Deployment
         run: |
           Set-Location ".\source"
+          
+          Write-Host "========================================" -ForegroundColor Cyan
+          Write-Host "Applying Kubernetes Deployment..." -ForegroundColor Yellow
+          Write-Host "========================================" -ForegroundColor Cyan
+          
           kubectl apply -f k8s/deployment.yaml
 
       - name: Restart Deployment in Kubernetes
         run: |
           Set-Location ".\source"
+          
+          Write-Host "========================================" -ForegroundColor Cyan
+          Write-Host "Restarting Kubernetes Deployment..." -ForegroundColor Yellow
+          Write-Host "========================================" -ForegroundColor Cyan
+          
           kubectl rollout restart deployment/product-service
           kubectl rollout status deployment/product-service --timeout=180s
           kubectl get pods -l app=product-service
