@@ -8,14 +8,14 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}   # مثلاً username/repo
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write    # اجازه‌ی نوشتن توی GitHub Packages
+      packages: write
 
     steps:
     - name: Checkout code
@@ -26,6 +26,9 @@ jobs:
       with:
         java-version: '17'
         distribution: 'temurin'
+
+    - name: Make mvnw executable
+      run: chmod +x mvnw
 
     - name: Build with Maven (using wrapper)
       run: ./mvnw clean package -DskipTests
