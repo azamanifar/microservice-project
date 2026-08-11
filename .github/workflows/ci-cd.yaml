@@ -8,26 +8,58 @@ jobs:
   build-and-deploy:
     runs-on: self-hosted
 
+    permissions:
+      contents: read
+
+    defaults:
+      run:
+        shell: powershell
+
     steps:
-      # مرحله ۱: کد رو از گیت‌هاب می‌کشه پایین
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Clean old source
+        run: |
+          if (Test-Path ".\source") {
+            Remove-Item ".\source" -Recurse -Force
+          }
 
-      # مرحله ۲: جاوا رو نصب می‌کنه (نسخه رو مطابق پروژه‌ت بگذار)
-      - name: Set up JDK
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
+      - name: Checkout code manually
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $cloneUrl = "https://x-access-token:${env:GH_TOKEN}@github.com/${env:GITHUB_REPOSITORY}.git"
+          git clone --depth 1 --branch "${env:GITHUB_REF_NAME}" $cloneUrl source
 
-      # مرحله ۳: پروژه رو با Maven بیلد می‌کنه
+      - name: Check tools
+        run: |
+          Set-Location ".\source"
+          java -version
+          docker version
+          kubectl version --client
+          kubectl config current-context
+
       - name: Build with Maven
-        run: ./mvnw.cmd clean package -DskipTests
+        run: |
+          Set-Location ".\source"
 
-      # مرحله ۴: Docker Image جدید می‌سازه
+          if (Test-Path ".\mvnw.cmd") {
+            .\mvnw.cmd clean package -DskipTests
+          } else {
+            mvn clean package -DskipTests
+          }
+
       - name: Build Docker Image
-        run: docker build -t product-service:latest .
+        run: |
+          Set-Location ".\source"
+          docker build -t product-service:latest .
 
-      # مرحله ۵: توی Kubernetes، دیپلویمنت رو با ایمیج جدید آپدیت می‌کنه
+      - name: Apply Kubernetes Deployment
+        run: |
+          Set-Location ".\source"
+          kubectl apply -f k8s/deployment.yaml
+
       - name: Restart Deployment in Kubernetes
-        run: kubectl rollout restart deployment product-service
+        run: |
+          Set-Location ".\source"
+          kubectl rollout restart deployment/product-service
+          kubectl rollout status deployment/product-service --timeout=180s
+          kubectl get pods -l app=product-service
